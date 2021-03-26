@@ -66,33 +66,37 @@ void lcd(void);
 const cfg_t def_cfg = {
 		.flg.temp_F_or_C = false,
 		.flg.comfort_smiley = true,
+		.flg2.smiley = 0, // 0 = "     " off
 		.flg.blinking_time_smile = false,
 		.flg.show_batt_enabled = false,
 		.flg.advertising_type = 3,
 		.flg.tx_measures = false,
-		.flg2.smiley = 0, // 0 = "     " off
 		.advertising_interval = 40, // multiply by 62.5 ms = 2.5 sec
-#if DEVICE_TYPE == DEVICE_MHO_C401
-		.measure_interval = 8, // * advertising_interval = 20 sec
-		.min_step_time_update_lcd = 199, //x0.05 sec,   9.95 sec
-		.hw_cfg.hwver = 1,
-#else // DEVICE_LYWSD03MMC
+#if DEVICE_TYPE == DEVICE_LYWSD03MMC
 		.measure_interval = 4, // * advertising_interval = 10 sec
 		.min_step_time_update_lcd = 49, //x0.05 sec,   2.45 sec
 		.hw_cfg.hwver = 0,
+#elif DEVICE_TYPE == DEVICE_MHO_C401
+		.measure_interval = 8, // * advertising_interval = 20 sec
+		.min_step_time_update_lcd = 199, //x0.05 sec,   9.95 sec
+		.hw_cfg.hwver = 1,
+#elif DEVICE_TYPE == DEVICE_CGG1
+		.measure_interval = 8, // * advertising_interval = 20 sec
+		.min_step_time_update_lcd = 199, //x0.05 sec,   9.95 sec
+		.hw_cfg.hwver = 2,
 #endif
 #if USE_FLASH_MEMO || USE_CLOCK
 		.hw_cfg.clock = 1,
 #endif
 #if USE_FLASH_MEMO
 		.hw_cfg.memo = 1,
-#if DEVICE_TYPE == DEVICE_MHO_C401
-		.averaging_measurements = 30, // * measure_interval = 20 * 30 = 600 sec = 10 minutes
-#else // DEVICE_LYWSD03MMC
+#if DEVICE_TYPE == DEVICE_LYWSD03MMC
 		.averaging_measurements = 60, // * measure_interval = 10 * 60 = 600 sec = 10 minutes
+#else // DEVICE_TYPE == DEVICE_MHO_C401 & DEVICE_CGG1
+		.averaging_measurements = 30, // * measure_interval = 20 * 30 = 600 sec = 10 minutes
 #endif
 #endif
-		.rf_tx_power = RF_POWER_P3p01dBm,
+		.rf_tx_power = RF_POWER_P0p04dBm, // RF_POWER_P3p01dBm,
 		.connect_latency = 124 // (124+1)*1.25*16 = 2500 ms
 		};
 RAM cfg_t cfg;
@@ -100,13 +104,8 @@ static const external_data_t def_ext = {
 		.big_number = 0,
 		.small_number = 0,
 		.vtime_sec = 60 * 10, // 10 minutes
-#if DEVICE_TYPE == DEVICE_MHO_C401
-		.flg.smiley = 7, // 7 = "ooo"
-		.flg.percent_on = true,
-#else // DEVICE_LYWSD03MMC
 		.flg.smiley = 7, // 7 = "(ooo)"
 		.flg.percent_on = true,
-#endif
 		.flg.battery = false,
 		.flg.temp_symbol = 5 // 5 = "°C", ... app.h
 		};
@@ -149,7 +148,7 @@ __attribute__((optimize("-Os"))) void test_config(void) {
 		connection_timeout = 100;	//x10 ms,  1 sec
 	if(!cfg.connect_latency) {
 		my_periConnParameters.intervalMin = (cfg.advertising_interval * 625 / 30) - 1; // Tmin = 20*1.25 = 25 ms, Tmax = 3333*1.25 = 4166.25 ms
-		my_periConnParameters.intervalMax = my_periConnParameters.intervalMin + 2;
+		my_periConnParameters.intervalMax = my_periConnParameters.intervalMin + 5;
 		my_periConnParameters.latency = 0;
 	} else {
 		my_periConnParameters.intervalMin = 16; // 10*1.25 = 12.5 ms
@@ -164,6 +163,8 @@ __attribute__((optimize("-Os"))) void test_config(void) {
 	cfg.hw_cfg.hwver = 0;
 #elif DEVICE_TYPE == DEVICE_MHO_C401
 	cfg.hw_cfg.hwver = 1;
+#elif DEVICE_TYPE == DEVICE_CGG1
+	cfg.hw_cfg.hwver = 2;
 #else
 	cfg.hw_cfg.hwver = 3;
 #endif
@@ -188,7 +189,7 @@ _attribute_ram_code_ void WakeupLowPowerCb(int par) {
 			write_memo();
 #endif
 #if	USE_MIHOME_BEACON
-		if((cfg.flg.advertising_type & 2) && cfg.flg2.mi_beacon && pbindkey)
+		if((cfg.flg.advertising_type & 2) && cfg.flg2.mi_beacon)
 			mi_beacon_summ();
 #endif
 		set_adv_data(cfg.flg.advertising_type);
@@ -214,6 +215,22 @@ _attribute_ram_code_ void suspend_enter_cb(u8 e, u8 *p, int n) {
 	}
 }
 
+void low_vbat(void) {
+	show_temp_symbol(0);
+	show_big_number(measured_data.battery_mv * 10);
+#if DEVICE_TYPE == DEVICE_CGG1
+	show_small_number(-1023, 1); // "Lo"
+#else
+	show_small_number(-123, 1); // "Lo"
+#endif
+	show_battery_symbol(1);
+	update_lcd();
+#if (DEVICE_TYPE == DEVICE_MHO_C401) || (DEVICE_TYPE == DEVICE_CGG1)
+	while(task_lcd()) pm_wait_ms(10);
+#endif
+	cpu_sleep_wakeup(DEEPSLEEP_MODE, PM_WAKEUP_TIMER,
+			clock_time() + 120 * CLOCK_16M_SYS_TIMER_CLK_1S); // go deep-sleep 2 minutes
+}
 //------------------ user_init_normal -------------------
 void user_init_normal(void) {//this will get executed one time after power up
 	random_generator_init(); //must
@@ -261,16 +278,7 @@ void user_init_normal(void) {//this will get executed one time after power up
 	battery_level = get_battery_level(measured_data.battery_mv);
 	init_lcd();
 	if (measured_data.battery_mv < 2000) {
-		show_temp_symbol(0);
-		show_big_number(measured_data.battery_mv * 10);
-		show_small_number(-100, 1);
-		show_battery_symbol(1);
-		update_lcd();
-#if DEVICE_TYPE == DEVICE_MHO_C401
-		while(task_lcd()) pm_wait_ms(10);
-#endif
-		cpu_sleep_wakeup(DEEPSLEEP_MODE, PM_WAKEUP_TIMER,
-				clock_time() + 120 * CLOCK_16M_SYS_TIMER_CLK_1S); // go deep-sleep 2 minutes
+		low_vbat();
 	}
 	read_sensor_low_power();
 	wrk_measure = 1;
@@ -293,15 +301,9 @@ _attribute_ram_code_ void user_init_deepRetn(void) {//after sleep this will get 
 
 _attribute_ram_code_ uint8_t is_comfort(int16_t t, uint16_t h) {
 	uint8_t ret = SMILE_SAD;
-	if(t >= cmf.t[0] && t <= cmf.t[1] && h >= cmf.h[0] && h <= cmf.h[1]) ret = SMILE_HAPPY;
+	if(t >= cmf.t[0] && t <= cmf.t[1] && h >= cmf.h[0] && h <= cmf.h[1])
+		ret = SMILE_HAPPY;
 	return ret;
-}
-
-_attribute_ram_code_ void lcd_set_ext_data(void) {
-	show_battery_symbol(ext.flg.battery);
-	show_small_number(ext.small_number, ext.flg.percent_on);
-	show_temp_symbol(*((uint8_t *) &ext.flg));
-	show_big_number(ext.big_number);
 }
 
 _attribute_ram_code_ __attribute__((optimize("-Os"))) void lcd(void) {
@@ -313,11 +315,19 @@ _attribute_ram_code_ __attribute__((optimize("-Os"))) void lcd(void) {
 	}
 	show_stage++;
 	if (chow_tick_sec && (show_stage & 2)) { // show ext data
-		if (show_stage & 1) { // stage blinking or show battery
-			if (cfg.flg.show_batt_enabled || battery_level <= 5) { // Battery
+		if (show_stage & 1) { // stage blinking or show battery or clock
+			if (cfg.flg.show_batt_enabled
+#if DEVICE_TYPE != DEVICE_CGG1
+				|| battery_level <= 15
+#endif
+				) { // Battery
 				show_smiley(0); // stage show battery
 				show_battery_symbol(1);
+#if DEVICE_TYPE == DEVICE_CGG1
+				show_batt_cgg1();
+#else
 				show_small_number((battery_level >= 100) ? 99 : battery_level, 1);
+#endif
 				set_small_number_and_bat = false;
 			} else if (cfg.flg.blinking_time_smile) { // blinking on
 #if	USE_CLOCK
@@ -346,10 +356,18 @@ _attribute_ram_code_ __attribute__((optimize("-Os"))) void lcd(void) {
 				return;
 			}
 #endif
-			if (cfg.flg.show_batt_enabled || battery_level <= 5) { // Battery
+			if (cfg.flg.show_batt_enabled
+#if DEVICE_TYPE != DEVICE_CGG1
+				|| battery_level <= 15
+#endif
+				) { // Battery
 				show_smiley(0); // stage show battery
 				show_battery_symbol(1);
+#if DEVICE_TYPE == DEVICE_CGG1
+				show_batt_cgg1();
+#else
 				show_small_number((battery_level >= 100) ? 99 : battery_level, 1);
+#endif
 				set_small_number_and_bat = false;
 			} else if (cfg.flg.blinking_time_smile) { // blinking on
 #if	USE_CLOCK
@@ -372,8 +390,13 @@ _attribute_ram_code_ __attribute__((optimize("-Os"))) void lcd(void) {
 				show_smiley(cfg.flg2.smiley); // no blinking
 		}
 		if (set_small_number_and_bat) {
+#if DEVICE_TYPE == DEVICE_CGG1
+			show_battery_symbol(!cfg.flg.show_batt_enabled);
+			show_small_number(measured_data.humi / 10, 1);
+#else
 			show_battery_symbol(0);
 			show_small_number(last_humi, 1);
+#endif
 		}
 		if (cfg.flg.temp_F_or_C) {
 			show_temp_symbol(TMP_SYM_F); // "°F"
@@ -412,11 +435,19 @@ _attribute_ram_code_ void main_loop(void) {
 				if (cfg.flg.lp_measures) {
 					read_sensor_low_power();
 					measured_data.battery_mv = get_battery_mv();
+					if (measured_data.battery_mv < 2000) {
+						low_vbat();
+					}
 					battery_level = get_battery_level(measured_data.battery_mv);
 					WakeupLowPowerCb(0);
 				} else {
 					read_sensor_deep_sleep();
 					measured_data.battery_mv = get_battery_mv();
+					if (measured_data.battery_mv < 2000) {
+						pm_wait_ms(11);
+						read_sensor_cb();
+						low_vbat();
+					}
 					battery_level = get_battery_level(measured_data.battery_mv);
 					if (bls_pm_getSystemWakeupTick() - clock_time() > SENSOR_MEASURING_TIMEOUT + 5*CLOCK_16M_SYS_TIMER_CLK_1MS) {
 						bls_pm_registerAppWakeupLowPowerCb(WakeupLowPowerCb);
@@ -466,7 +497,7 @@ _attribute_ram_code_ void main_loop(void) {
 						lcd_flg.b.new_update = lcd_flg.b.notify_on;
 						lcd();
 					}
-#if DEVICE_TYPE == DEVICE_MHO_C401
+#if (DEVICE_TYPE == DEVICE_MHO_C401) || (DEVICE_TYPE == DEVICE_CGG1)
 					if(!stage_lcd)
 #endif
 						update_lcd();
@@ -480,7 +511,7 @@ _attribute_ram_code_ void main_loop(void) {
 			if(adv_old_count != adv_send_count)
 				set_adv_data(cfg.flg.advertising_type);
 		}
-#if DEVICE_TYPE == DEVICE_MHO_C401
+#if (DEVICE_TYPE == DEVICE_MHO_C401) || (DEVICE_TYPE == DEVICE_CGG1)
 		if(wrk_measure == 0 && stage_lcd) {
 			if(gpio_read(EPD_BUSY) && (!task_lcd())) {
 				cpu_set_gpio_wakeup(EPD_BUSY, Level_High, 0);  // pad high wakeup deepsleep disable

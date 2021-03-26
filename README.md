@@ -1,4 +1,4 @@
-# Xiaomi Mijia (LYWSD03MMC) & Xiaomi Miaomiaoce (MHO-C401) Bluetooth Thermometer Firmware
+# Xiaomi Mijia (LYWSD03MMC) & Xiaomi Miaomiaoce (MHO-C401) & CGG1 Mijia Bluetooth Thermometer Firmware
 
 This repository contains custom firmware for two Xiaomi Mijia Smart Bluetooth Thermometer & Hygrometer devices.
 
@@ -14,9 +14,9 @@ The custom firmware can be flashed _via a modern browser_ and _over-the-air (OTA
 * Concurrent support for Xiaomi, ATC and Custom Bluetooth Advertisement format
 * Adjustable RF TX Power & Bluetooth advertising interval
 
-|Xiaomi Mijia (LYWSD03MMC) | Xiaomi Miaomiaoce (MHO-C401) |
-|:--:|:--:|
-|  <img src="https://tasmota.github.io/docs/_media/bluetooth/LYWSD03MMC.png" alt="Xiaomi Mijia (LYWSD03MMC)" width="160"/> |  <img src="https://tasmota.github.io/docs/_media/bluetooth/MHO-C401.png" alt="Xiaomi Miaomiaoce (MHO-C401)" width="160"/> |
+|Xiaomi Mijia (LYWSD03MMC) | [Xiaomi Miaomiaoce (MHO-C401)](https://pvvx.github.io/MHO_C401) | [Qingping Temp & RH Monitor (CGG1-Mijia)](https://pvvx.github.io/CGG1) |
+|:--:|:--:|:--:|
+|  <img src="https://tasmota.github.io/docs/_media/bluetooth/LYWSD03MMC.png" alt="Xiaomi Mijia (LYWSD03MMC)" width="160"/> |  <img src="https://tasmota.github.io/docs/_media/bluetooth/MHO-C401.png" alt="Xiaomi Miaomiaoce (MHO-C401)" width="160"/> | <img src="https://pvvx.github.io/CGG1/img/CGG1-M.jpg" alt="E-ink CGG1 'Qingping Temp & RH Monitor', Xiaomi Mijia DevID: 0x0B48" width="160"/> |
 
 **Table of content**
 
@@ -102,8 +102,9 @@ You can directly update/flash the firmware without downloading the binaries belo
 
 **Custom Firmware Versions:**
 
-* [LYWSD03MMC Custom Firmware Version 2.6](https://github.com/pvvx/ATC_MiThermometer/raw/master/ATC_Thermometer26.bin)
-* [MHO-C401 Custom Firmware Version 2.6](https://github.com/pvvx/ATC_MiThermometer/raw/master/MHO_C401_v26.bin)
+* [LYWSD03MMC Custom Firmware Version 2.8](https://github.com/pvvx/ATC_MiThermometer/raw/master/ATC_Thermometer28c.bin)
+* [MHO-C401 Custom Firmware Version 2.8](https://github.com/pvvx/ATC_MiThermometer/raw/master/MHO_C401_v28c.bin)
+* [CGG1 Custom Firmware Version 2.8](https://github.com/pvvx/ATC_MiThermometer/raw/master/CGG1_v28c.bin)
 
 **Original Manufacturer Firmware Version**
 
@@ -111,6 +112,7 @@ In case you want to go back to the original firmware, you can download them here
 
 * [LYWSD03MMC Original Firmware v1.0.0_0109](https://github.com/pvvx/ATC_MiThermometer/raw/master/Original_OTA_Xiaomi_LYWSD03MMC_v1.0.0_0109.bin)
 * [MHO-C401 Original Firmware v1.0.0_0010](https://github.com/pvvx/ATC_MiThermometer/raw/master/Original_OTA_Xiaomi_MHO_C401_v1.0.0_0010.bin)
+* [CGG1 Original Firmware v1.0.1_0093](https://github.com/pvvx/ATC_MiThermometer/raw/master/Original_OTA_CGG1_v1.0.1_0093.bin)
 
 ### Firmware version history
 
@@ -131,6 +133,8 @@ In case you want to go back to the original firmware, you can download them here
 |     2.4 | Added parameter "Clock time step"
 |     2.5 | Remove TRG/FLG errors, minor optimization
 |     2.6 | Expanding the ranges of threshold parameters (TRG)
+|     2.7 | Reducing power consumption of MHO-C401 (EDP update), adding version for CGG1
+|     2.8 | Added saving bindkey to EEP if mi-keys are erased, reduced TX power to 0 dB for defaults.
 
 
 ## Applications
@@ -201,11 +205,14 @@ UUID 0x181A - size 19: Custom format (all data little-endian):
                        // bit4: Humidity trigger event
    ```
 
-#### Xioami Battery Charge
+#### Xiaomi Battery Charge
 3. UUID 0xFE95 - 0x0A: [Xiaomi](https://github.com/pvvx/ATC_MiThermometer/blob/master/InfoMijiaBLE/README.md) - battery charge level 0..100%, battery voltage in mV
 
-#### Xioami Temperature & Humidity
+#### Xiaomi Temperature & Humidity
 4. UUID 0xFE95 - 0x0D: [Xiaomi](https://github.com/pvvx/ATC_MiThermometer/blob/master/InfoMijiaBLE/README.md) - temperature x0.1C, humidity x0.1%
+
+#### Xiaomi Encrypted (bindkey enable)
+5. UUID 0xFE95 - 0x0A, 0x04, 0x06 [Xiaomi](https://github.com/pvvx/ATC_MiThermometer/blob/master/InfoMijiaBLE/Mijia%20BLE%20Object%20Definition.md) - battery charge level 0..100%, temperature x0.1C, humidity x0.1% (All data are averaged over a period of 16 measurements)
 
 ### Bluetooth Connection Mode
 + Primary Service - Environmental Sensing Service (0x181A):
@@ -277,6 +284,8 @@ ATC_MiThermometer is based on the original work of [@atc1441](https://twitter.co
 
 * [MHO-C401 Info](https://pvvx.github.io/MHO_C401/)
 
+* [CGG1-Mijia Info](https://pvvx.github.io/CGG1)
+
 * [Build Telink EVK on E104-BT10-G/N module (TLSR8269)](https://github.com/pvvx/TLSR8269-EVK)
 
 * [Alternative programmer TLSR SWire on module TB-04/03F or E104-BT10](https://github.com/pvvx/TLSRPGM)
@@ -285,7 +294,7 @@ ATC_MiThermometer is based on the original work of [@atc1441](https://twitter.co
 
 * [Reading and recovering Mi-Home keys](https://github.com/pvvx/ATC_MiThermometer/blob/master/img/)
 
-* [HTML files](https://github.com/pvvx/pvvx.github.io/tree/master/ATC_MiThermometer)
+* [HTML files](https://github.com/pvvx/pvvx.github.io)
 
 * [LYWSD03MMC Forum link (russian)](https://esp8266.ru/forum/threads/tlsr8251-lcd-termometr-lywsd03mmc-xiaomi-bluetooth-termometr.5263/)
 
@@ -308,6 +317,7 @@ ATC_MiThermometer is based on the original work of [@atc1441](https://twitter.co
 | 0x15 | Get all Mi keys                               |
 | 0x16 | Restore prev mi token & bindkeys              |
 | 0x17 | Delete all Mi keys                            |
+| 0x18 | Get/set binkey in EEP                         |
 | 0x20 | Get/Set comfort parameters                    |
 | 0x22 | Get/Set show LCD ext.data                     |
 | 0x23 | Get/Set Time                                  |
@@ -326,4 +336,6 @@ ATC_MiThermometer is based on the original work of [@atc1441](https://twitter.co
 | 0x70 | Set PinCode                                   |
 | 0x71 | Request Mtu Size Exchange                     |
 
+---
 
+![foto](https://raw.githubusercontent.com/pvvx/pvvx.github.io/master/SensorsTH.jpg)

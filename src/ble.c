@@ -33,7 +33,13 @@ RAM my_fifo_t blt_rxfifo = { 64, 8, 0, 0, blt_rxfifo_b, };
 RAM uint8_t blt_txfifo_b[40 * 16] = { 0 };
 RAM my_fifo_t blt_txfifo = { 40, 16, 0, 0, blt_txfifo_b, };
 RAM uint8_t ble_name[12] = { 11, 0x09,
+#if DEVICE_TYPE == DEVICE_MHO_C401
+		'M', 'H', 'O', '_', '0', '0', '0', '0',	'0', '0' };
+#elif DEVICE_TYPE == DEVICE_CGG1
+		'C', 'G', 'G', '_', '0', '0', '0', '0',	'0', '0' };
+#else
 		'A', 'T', 'C', '_', '0', '0', '0', '0',	'0', '0' };
+#endif
 RAM uint8_t mac_public[6];
 RAM uint8_t mac_random_static[6];
 RAM uint32_t adv_send_count;
@@ -52,6 +58,9 @@ void app_enter_ota_mode(void) {
 void ble_disconnect_callback(uint8_t e, uint8_t *p, int n) {
 	if(ble_connected & 0x80) // reset device on disconnect?
 		start_reboot();
+
+	bls_pm_setManualLatency(0); // ?
+
 	ble_connected = 0;
 	ota_is_working = 0;
 	mi_key_stage = 0;
@@ -67,19 +76,22 @@ void ble_disconnect_callback(uint8_t e, uint8_t *p, int n) {
 }
 
 void ble_connect_callback(uint8_t e, uint8_t *p, int n) {
-	ble_connected = 1;
-	if(cfg.connect_latency)
-		bls_l2cap_requestConnParamUpdate(16, 16, cfg.connect_latency, connection_timeout); // (16*1.25 ms, 16*1.25 ms, (16*1.25)*100 ms, 800*10 ms)
-	else
-		bls_l2cap_requestConnParamUpdate(my_periConnParameters.intervalMin, my_periConnParameters.intervalMax, cfg.connect_latency, connection_timeout); // (16*1.25 ms, 16*1.25 ms, (16*1.25)*100 ms, 800*10 ms)
 	// bls_l2cap_setMinimalUpdateReqSendingTime_after_connCreate(1000);
+	ble_connected = 1;
+	if(cfg.connect_latency) {
+		my_periConnParameters.intervalMin = 16;
+		my_periConnParameters.intervalMax = 16;
+	}
+	my_periConnParameters.latency = cfg.connect_latency;
+	my_periConnParameters.timeout = connection_timeout;
+	bls_l2cap_requestConnParamUpdate(my_periConnParameters.intervalMin, my_periConnParameters.intervalMax, my_periConnParameters.latency, my_periConnParameters.timeout);
 }
 
 int app_conn_param_update_response(u8 id, u16  result) {
 	if(result == CONN_PARAM_UPDATE_ACCEPT)
 		ble_connected |= 2;
 	else if(result == CONN_PARAM_UPDATE_REJECT) {
-		//bls_l2cap_requestConnParamUpdate(160, 160, 4, 300); // (200 ms, 200 ms, 1 s, 3 s)
+		bls_l2cap_requestConnParamUpdate(160, 160, 4, 300); // (200 ms, 200 ms, 1 s, 3 s)
 	}
 	return 0;
 }
@@ -157,10 +169,22 @@ void ble_get_name(void) {
 	int16_t len = flash_read_cfg(&ble_name[2], EEP_ID_DVN, sizeof(ble_name)-2);
 	if(len < 1) {
 		//Set the BLE Name to the last three MACs the first ones are always the same
+#if DEVICE_TYPE == DEVICE_MHO_C401
+		ble_name[2] = 'M';
+		ble_name[3] = 'H';
+		ble_name[4] = 'O';
+		ble_name[5] = '_';
+#elif DEVICE_TYPE == DEVICE_CGG1
+		ble_name[2] = 'C';
+		ble_name[3] = 'G';
+		ble_name[4] = 'G';
+		ble_name[5] = '_';
+#else
 		ble_name[2] = 'A';
 		ble_name[3] = 'T';
 		ble_name[4] = 'C';
 		ble_name[5] = '_';
+#endif
 		ble_name[6] = hex_ascii[mac_public[2] >> 4];
 		ble_name[7] = hex_ascii[mac_public[2] & 0x0f];
 		ble_name[8] = hex_ascii[mac_public[1] >> 4];
@@ -268,7 +292,7 @@ __attribute__((optimize("-Os"))) void init_ble(void) {
 	blc_l2cap_registerConnUpdateRspCb(app_conn_param_update_response);
 	bls_set_advertise_prepare(app_advertise_prepare_handler);
 #if USE_MIHOME_BEACON
-		mi_beacon_init();
+	mi_beacon_init();
 #endif
 
 #if 0 // BLE_SECURITY_ENABLE && DEVICE_TYPE != DEVICE_MHO_C401
@@ -322,7 +346,7 @@ _attribute_ram_code_ __attribute__((optimize("-Os"))) void set_adv_data(uint8_t 
 #endif
 	} else if(adv_type & 2) { // adv_type == 2 or 3
 #if USE_MIHOME_BEACON
-		if(pbindkey && cfg.flg2.mi_beacon)
+		if(cfg.flg2.mi_beacon)
 			mi_encrypt_beacon(measured_data.count >> 2);
 		else
 #endif

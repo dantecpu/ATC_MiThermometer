@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "app_config.h"
 
+/* CGG1 no symbol 'smiley' ! */
 #define SMILE_HAPPY 5 		// "(^-^)" happy
 #define SMILE_SAD   6 		// "(-^-)" sad
 #define TMP_SYM_C	0xA0	// "°C"
@@ -46,7 +47,6 @@ void show_big_number(int16_t number); // x0.1, (-995..19995), point auto: -99 ..
 void show_small_number(int16_t number, bool percent); // -9 .. 99
 void show_battery_symbol(bool state);
 void show_ble_symbol(bool state);
-void send_to_lcd_long(uint8_t byte1, uint8_t byte2, uint8_t byte3, uint8_t byte4, uint8_t byte5, uint8_t byte6);
 #if	USE_CLOCK
 void show_clock(void);
 #endif
@@ -55,8 +55,14 @@ void show_clock(void);
 extern uint8_t display_buff[18];
 extern uint8_t stage_lcd;
 int task_lcd(void);
+#elif DEVICE_TYPE == DEVICE_CGG1
+extern uint8_t display_buff[18];
+extern uint8_t stage_lcd;
+int task_lcd(void);
+void show_batt_cgg1(void);
 #elif DEVICE_TYPE == DEVICE_LYWSD03MMC
 extern uint8_t display_buff[6];
+void send_to_lcd_long(uint8_t byte1, uint8_t byte2, uint8_t byte3, uint8_t byte4, uint8_t byte5, uint8_t byte6);
 #else
 #error "Set DEVICE_TYPE!"
 #endif

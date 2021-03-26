@@ -97,13 +97,20 @@ static const u8 my_FirmStr[] = {"github.com/pvvx"}; // "1.0.0_0109"
 static const u8 my_HardStr[] = {"B1.4"};
 static const u8 my_SoftStr[] = {'V','0'+(VERSION>>4),'.','0'+(VERSION&0x0f)}; // "0109"
 static const u8 my_ManStr[] = {"miaomiaoce.com"};
+#elif DEVICE_TYPE == DEVICE_CGG1
+static const u8 my_ModelStr[] = {"CGG1"};
+static const u8 my_SerialStr[] = {"1234"};
+static const u8 my_FirmStr[] = {"github.com/pvvx"}; // "1.0.1_0093"
+static const u8 my_HardStr[] = {"0001"};
+static const u8 my_SoftStr[] = {'V','0'+(VERSION>>4),'.','0'+(VERSION&0x0f)}; // "0109"
+static const u8 my_ManStr[] = {"Qingping Technology (Beijing) Co., Ltd."};
 #else
 #error "DEVICE_TYPE = ?"
 #endif
 //------------------
 #endif // USE_DEVICE_INFO_CHR_UUID
 
-RAM gap_periConnectParams_t my_periConnParameters = {20, 40, 0, 1000};
+RAM gap_periConnectParams_t my_periConnParameters = {8, 40, 0, 1000};
 
 static u16 serviceChangeVal[2] = {0};
 
@@ -310,7 +317,7 @@ RAM attribute_t my_Attributes[] = {
 		{0,ATT_PERMISSIONS_READ,2,sizeof(my_appearanceCharVal),(u8*)(&my_characterUUID), (u8*)(my_appearanceCharVal), 0},
 		{0,ATT_PERMISSIONS_READ,2,sizeof (my_appearance), (u8*)(&my_appearanceUIID), 	(u8*)(&my_appearance), 0},
 		{0,ATT_PERMISSIONS_READ,2,sizeof(my_periConnParamCharVal),(u8*)(&my_characterUUID), (u8*)(my_periConnParamCharVal), 0},
-		{0,ATT_PERMISSIONS_READ,2,sizeof (my_periConnParameters),(u8*)(&my_periConnParamUUID), 	(u8*)(&my_periConnParameters), 0},
+		{0,ATT_PERMISSIONS_READ,2,sizeof(my_periConnParameters),(u8*)(&my_periConnParamUUID),(u8*)(&my_periConnParameters), 0},
 	// 0008 - 000b gatt
 	{4,ATT_PERMISSIONS_READ,2,2,(u8*)(&my_primaryServiceUUID), 	(u8*)(&my_gattServiceUUID), 0},
 		{0,ATT_PERMISSIONS_READ,2,sizeof(my_serviceChangeCharVal),(u8*)(&my_characterUUID), 		(u8*)(my_serviceChangeCharVal), 0},

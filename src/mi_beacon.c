@@ -61,6 +61,8 @@ typedef struct __attribute__((packed)) _beacon_nonce_t{
 
 //// Init data
 RAM uint8_t *pbindkey;
+RAM uint8_t bindkey[16];
+
 RAM beacon_nonce_t beacon_nonce;
 //// Counters
 RAM uint32_t adv_mi_cnt = 0xffffffff; // counter of measurement numbers from sensors
@@ -83,19 +85,22 @@ typedef struct _summ_data_t {
 RAM mib_summ_data_t mib_summ_data;
 
 /* Initializing mi beacon */
-int mi_beacon_init(void) {
+void mi_beacon_init(void) {
 	uint8_t *p_key = find_mi_keys(MI_KEYTBIND_ID, 1);
 	if(p_key) {
 		pbindkey = p_key + 12;
 		p_key = find_mi_keys(MI_KEYSEQNUM_ID, 1);
 		if(p_key)
 			memcpy(&beacon_nonce.cnt, p_key, 4);
-		memcpy(beacon_nonce.mac, mac_public, 6);
-		beacon_nonce.pid = DEVICE_TYPE;
-		return 0;
+	} else {
+		pbindkey = bindkey;
+		if(flash_read_cfg(pbindkey, EEP_ID_KEY, sizeof(bindkey)) != sizeof(bindkey)) {
+			generateRandomNum(sizeof(bindkey), pbindkey);
+			flash_write_cfg(pbindkey, EEP_ID_KEY, sizeof(bindkey));
+		}
 	}
-	pbindkey = NULL;
-	return 1;
+	memcpy(beacon_nonce.mac, mac_public, 6);
+	beacon_nonce.pid = DEVICE_TYPE;
 }
 
 /* Averaging measurements */
@@ -115,7 +120,7 @@ __attribute__((optimize("-Os"))) void mi_encrypt_beacon(uint32_t cnt) {
 	}
 	adv_mi_cnt = cnt; // new counter
 	beacon_nonce.cnt = cnt;
-	if((cnt & 3) == 0) { //
+	if((cnt & 3) == 0) { // Data are averaged over a period of 16 measurements (cnt*4)
 		mi_beacon_data.temp = ((int16_t)(mib_summ_data.temp/(int32_t)mib_summ_data.count))/10;
 		mi_beacon_data.humi = ((uint16_t)(mib_summ_data.humi/mib_summ_data.count))/10;
 		mi_beacon_data.batt = get_battery_level((uint16_t)(mib_summ_data.batt/mib_summ_data.count));
@@ -127,7 +132,6 @@ __attribute__((optimize("-Os"))) void mi_encrypt_beacon(uint32_t cnt) {
 	p->dev_id = beacon_nonce.pid;
 	p->counter = cnt;
 	memcpy(p->MAC, mac_public, 6);
-#endif
 	uint8_t *mic = (uint8_t *)p;
 	mic += sizeof(adv_mi_enc_t);
 	switch(cnt & 3) {
@@ -164,6 +168,7 @@ __attribute__((optimize("-Os"))) void mi_encrypt_beacon(uint32_t cnt) {
 	p->fctrl.bit.version = 5; // XIAOMI_DEV_VERSION
 #else
 	p->fctrl.word = 0x5858; // 0x5830
+#endif
 	p->size = p->data_len + sizeof(adv_mi_enc_t) + 3 + 4 - 1;
 	*mic++ = beacon_nonce.ext_cnt[0];
 	*mic++ = beacon_nonce.ext_cnt[1];
